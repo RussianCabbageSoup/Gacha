@@ -23,7 +23,7 @@ private:
 	int countFIVE = 0;
 	int Rate = 0;
 
-	double calForFive() {
+	double RateForFive() {
 		if (countFIVE >= 80) {
 			return 0.28;
 		}
@@ -38,7 +38,7 @@ private:
 		}
 	}
 
-	double calcForFour() {
+	double RateForFour() {
 		if (countFOUR >= 7) {
 			return 0.25;
 		}
@@ -75,7 +75,7 @@ public:
 
 		double chance = charDist(gen);
 
-		if (chance < calForFive() || countFIVE == 90) {
+		if (chance < RateForFive() || countFIVE == 90) {
 			uniform_int_distribution<> dis(0, FiveStarCharacter.size() - 1);
 			string drop = FiveStarCharacter[dis(gen)];
 			cout << "Drop: 5-Star: " << drop;
@@ -86,7 +86,7 @@ public:
 			Rate = 0;
 
 		}
-		else if (chance < calcForFour() || countFOUR == 10) {
+		else if (chance < RateForFour() || countFOUR == 10) {
 			if (charDist(gen) < 0.5) {
 				uniform_int_distribution<> dis(0, FourStarCharacter.size() - 1);
 				cout << "Drop: 4-Star char: " << FourStarCharacter[dis(gen)];
