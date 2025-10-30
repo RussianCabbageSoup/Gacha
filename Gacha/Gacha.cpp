@@ -50,7 +50,7 @@ private:
 			return 0.066;
 		}
 		else {
-			return 0.006;
+			return 1.0;
 		}
 	}
 
@@ -136,7 +136,7 @@ public:
 		double chance = charDist(gen);
 
 		if (chance < RateForFive() || countFIVE == 90) {
-			if (charDist(gen) < 0.5) {
+			if (charDist(gen) < 1.0) {
 				uniform_int_distribution<> dis(0, FiveStarCharacter.size() - 1);
 				string drop = FiveStarCharacter[dis(gen)];
 				cout << "5-Star " << drop;
@@ -188,6 +188,12 @@ public:
 			cout << endl;
 		}
 	}
+};
+
+class Character {
+private:
+protected:
+public:
 };
 
 int main() {
