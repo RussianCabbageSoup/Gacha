@@ -4,237 +4,291 @@
 #include <conio.h>
 #include <limits>
 #include <iomanip>
-#include <numeric> 
-
-using namespace std;
+#include <cmath>
+#include <algorithm>
 
 class GachaSystem {
 private:
 
-	vector<string> ThreeStarItem = { "Trash" };
+    std::random_device rd;
+    std::mt19937 gen;
+    std::uniform_real_distribution<> charDist;
 
-	vector<string> FourStarItem = { "Церемониальный меч", "Меч Фавония", "Церемониальный двуручный меч", "Двуручный меч Фавония",
-		"Гроза драконов", "Церемониальный мемуары", "Кодекс Фавония", "Церемониальный лук", "Боевой лук Фавония", "Драконий рык", 
-		"Меч-флейта", "Дождерез", "Меч-колокол", "Копьё Фавония", "Око сознания", "Песнь Странника", "Ржавый лук", "Бесструнный"};
+    const std::vector<std::string> threeStarItem = { "Trash" };
 
-	vector<string> FourStarCharacter = { 
-		"Айно", "Ифа", "Лань Янь", "Качина", "Ка Мин", "Шарлотта", "Линнет", "Мика", "Фарузан", "Кандакия", "Коллеи", "Юнь Цзинь",
-		"Сиканоин Хэйдзо", "Горо" , "Тома", "Розария", "Сахароза", "Чун Юнь", "Беннет", "Нин Гуан", "Бэй Доу", "Эмбер", "Кэйа", "Лиза",
-		"Далия", "Иансан", "Оророн", "Сетос", "Шеврёз", "Фремине", "Кавех", "Яо Яо", "Лайла", "Дори", "Куки Синобу", "Кирара",
-		"Кудзё Сара", "Саю", "Янь Фэй", "Синь Янь", "Диона", "Ноэлль", "Фишль", "Син Цю", "Сян Лин", "Рэйзор", "Барбара" };
+    const std::vector<std::string> fourStarItem = {
+        "Ceremonial Sword", "Favonius Sword", "Ceremonial Greatsword", "Favonius Greatsword",
+        "Dragon's Thunder", "Ceremonial Memoirs", "Favonius Codex", "Ceremonial Bow", "Favonius Warbow", "Dragon's Roar",
+        "Sword-Flute", "Raincutter", "Sword-Bell", "Favonius Lance", "Eye of Perception", "Wanderer's Song", "Rusty Bow", "Stringless" };
 
-	vector<string> FiveStarCharacter = { "Мидзуки", "Тигнари", "Мона", "Дилюк", "Дэхья", "Кэ Цин", "Ци Ци", "Джинн"};
+    const std::vector<std::string> fourStarCharacter = {
+        "Aino", "Ifa", "Lan Yan", "Kachina", "Ka Min", "Charlotte", "Lynette", "Mika", "Faruzan", "Candace", "Collei", "Yun Jin",
+        "Shikanoin Heizou", "Gorou", "Thoma", "Rosaria", "Sucrose", "Chongyun", "Bennett", "Ningguang", "Beidou", "Amber", "Kaeya", "Lisa",
+        "Dahlia", "Yanxiao", "Ororon", "Sethos", "Chevreuse", "Freminet", "Kaveh", "Yaoyao", "Layla", "Dori", "Kuki Shinobu", "Kirara",
+        "Kujou Sara", "Sayu", "Yanfei", "Xinyan", "Diona", "Noelle", "Fischl", "Xingqiu", "Xiangling", "Razor", "Barbara" };
 
-	vector<string> FiveStarItem = { "Небесный меч", "Волчья погибель", "Нефритовый Коршун", "Молитва Святым Ветрам", "Лук Амоса", 
-		"Меч Сокола", "Небесное величие", "Небесная ось", "Небесный атлас", "Небесное крыло" };
+    const std::vector<std::string> fiveStarCharacter = { "Mizuki", "Tighnari", "Mona", "Diluc", "Dehya", "Keqing", "Qiqi", "Jean" };
 
-	vector<int> FiveStarScore;
-	vector <string> FiveStarDrop;
+    const std::vector<std::string> fiveStarItem = {
+        "Skyward Sword", "Wolf's Gravestone", "Jade Cutter", "Prayer to the Sacred Winds", "Amos' Bow",
+        "Falcon Sword", "Skyward Pride", "Skyward Spine", "Skyward Atlas", "Skyward Wing" };
 
-	vector<string> charDrop;
+    struct dinamicParameters {
+        struct massive {
+            std::vector <std::pair<std::string, int>> fiveStarDrop;
+            std::vector<std::pair<std::string, int>> charDrop;
+            std::vector<std::string> inventory;
+        };
+        struct number {
+            int countForFourStar = 0;
+            int countForFiveStar = 0;
+            int rate = 0;
+            long starBless = 0;
+            long stardust = 0;
+            int totalPullCounter = 0;
+        };
+    };
 
-	vector<short> constList;
+    dinamicParameters::massive listVal;
+    dinamicParameters::number numberVal;
 
-	int countFOUR = 0;
-	int countFIVE = 0;
-	int Rate = 0;
+    struct basisParameters {
+        static constexpr double baseFiveStarChance = 0.007;
+        static constexpr double baseFourStarChance = 0.051;
+        static constexpr int startPityValue = 73;
+        static constexpr int fiveStarLimit = 90;
+        static constexpr int fourStarLimit = 10;
+        static constexpr std::pair<double, double> factor = {0.04, 2.85};
+        static constexpr int constLimit = 6;
+    };
 
-	double RateForFive() {
-		if (countFIVE >= 80) {
-			return 0.25;
-		}
-		else if (countFIVE >= 75) {
-			return 0.12;
-		}
-		else if (countFIVE >= 70) {
-			return 0.066;
-		}
-		else {
-			return 1.0;
-		}
-	}
+    double calcProbability(int currentPull) {
+        return basisParameters::factor.first * currentPull - basisParameters::factor.second;
+    }
 
-	double RateForFour() {
-		if (countFOUR >= 8) {
-			return 0.25;
-		}
-		else if (countFOUR >= 6) {
-			return 0.11;
-		}
-		else {
-			return 0.051;
-		}
-	}
+    double rateForFiveStar(int currentPull) {
+        if (currentPull == basisParameters::fiveStarLimit) { return 1.0; }
+        if (currentPull >= basisParameters::startPityValue) { return calcProbability(currentPull); }
+        else { return basisParameters::baseFiveStarChance; }
+    }
 
-	void checkDublicate(string drop) {
+    double rateForFourStar(int currentPull) {
+        if (currentPull == basisParameters::fourStarLimit) { return 1.0; }
+        else { return basisParameters::baseFourStarChance; }
+    }
 
-		bool dublicate = false;
-		size_t index;
-		
-		for (size_t i = 0; i < charDrop.size(); i++) {
-			if (drop == charDrop[i]) {
-				dublicate = true;
-				index = i;
-			}
-		}
-		if (!dublicate) {
-			charDrop.push_back(drop);
-			constList.push_back(0);
-		}
-		else {
-			if (constList[index] < 6) constList[index]++;
-		}
-	}
-	
+    bool checkDuplicate(std::string drop) {
+        bool duplicate = false;
+        bool isLastConst = false;
+        size_t index;
+
+        for (size_t i = 0; i < listVal.charDrop.size(); i++) {
+            if (drop == listVal.charDrop[i].first) {
+                duplicate = true;
+                index = i;
+            }
+        }
+        if (!duplicate) {
+            listVal.charDrop.push_back({ drop, 0 });
+        }
+        else {
+            if (listVal.charDrop[index].second < basisParameters::constLimit) { listVal.charDrop[index].second++; }
+            else isLastConst = true;
+        }
+        return isLastConst;
+    }
+
 public:
 
-	random_device rd;
-	mt19937 gen;
-	uniform_real_distribution<> charDist;
+    GachaSystem() : gen(rd()), charDist(0.0, 1.0) {}
 
-	int counter = 0;
+    int getPulls() {
+        return numberVal.totalPullCounter; 
+    }
 
-	GachaSystem(): gen(rd()), charDist(0.0, 1.0) {}
+    void getCurrency() {
+        std::cout << "Star Bless: " << numberVal.starBless << " (" << numberVal.starBless / 5.0 << ")" << std::endl;
+        std::cout << "Stardust: " << numberVal.stardust << std::endl;
+    }
 
-	void ConstList() {
-		if (!charDrop.empty()) {
+    void getInventory() {
+        if (!listVal.inventory.empty()) {
+            for (size_t i = 1; i < listVal.inventory.size() + 1; i++) {
+                std::cout << std::setw(30) << listVal.inventory[i - 1];
+                if (i % 3 == 0) std::cout << std::endl;
+            }
+        }
+        else {
+            std::cout << "You haven't obtained any items" << std::endl;
+        }
+        std::cout << std::endl;
+    }
 
-			vector<size_t> indices(charDrop.size());
-			iota(indices.begin(), indices.end(), 0);
+    void constellationList() {
+        if (!listVal.charDrop.empty()) {
+            std::sort(listVal.charDrop.begin(), listVal.charDrop.end(), [](const std::pair<std::string, int>& a, const std::pair<std::string, int>& b) {
+                return a.second > b.second; });
 
-			sort(indices.begin(), indices.end(), [&](size_t i1, size_t i2) {
-				return constList[i1] > constList[i2];
-				});
+            for (size_t i = 1; i < listVal.charDrop.size() + 1; i++) {
+                std::cout << std::setw(30) << listVal.charDrop[i - 1].first << " " << listVal.charDrop[i - 1].second;
+                if (i != 0 && i % 3 == 0) std::cout << std::endl;
+            }
+        }
+        else {
+            std::cout << "You don't have any characters yet" << std::endl;
+        }
+    }
 
-			for (size_t i : indices) {
-				cout << setw(21) << charDrop[i] << " (" << constList[i] << ")" << endl;
-			}
-		}
-		else {
-			cout << "У тебя ещё нет ни одного персонажа" << endl;
-		}
-	}
+    void getStatistic() {
 
-	void GetStat() {
-		if (!FiveStarDrop.empty()) {
-			for (size_t i = 0; i < FiveStarScore.size(); i++) {
-				cout << setw(21) << FiveStarDrop[i] << " - " << FiveStarScore[i] << endl;
-			}
-		}
-		else {
-			cout << "Ты ещё не получил ни одного 5-star дропа" << endl;
-		}
-	}
+        double avr = 0;
+        std::vector<int> dist(90, 0);
 
-	void SingleWish() {
+        if (!listVal.fiveStarDrop.empty()) {
 
-		counter++;
-		countFIVE++;
-		countFOUR++;
-		Rate++;
+            for (size_t i = 1; i < listVal.fiveStarDrop.size() + 1; i++) {
+                std::cout << std::setw(30) << listVal.fiveStarDrop[i - 1].first << " - " << listVal.fiveStarDrop[i - 1].second;
+                if (i != 0 && i % 3 == 0) std::cout << std::endl;
 
-		double chance = charDist(gen);
+                avr += listVal.fiveStarDrop[i - 1].second;
+            }
+            avr /= (double)listVal.fiveStarDrop.size();
+            std::cout << std::endl;
 
-		if (chance < RateForFive() || countFIVE == 90) {
-			if (charDist(gen) < 1.0) {
-				uniform_int_distribution<> dis(0, FiveStarCharacter.size() - 1);
-				string drop = FiveStarCharacter[dis(gen)];
-				cout << "5-Star " << drop;
+            for (size_t i = 0; i < listVal.fiveStarDrop.size(); i++) {
+                dist[listVal.fiveStarDrop[i].second - 1]++;
+            }
+        }
+        else {
+            std::cout << "You haven't obtained any 5-star drops yet" << std::endl;
+        }
 
-				checkDublicate(drop);
+        std::cout << std::endl;
+        std::cout << std::setw(15) << "Average: " << avr << std::endl;
+        std::cout << std::setw(15) << "Distribution: " << std::endl;
+        std::cout << std::endl;
+        for (size_t i = 1; i < dist.size() + 1; i++) {
+            std::cout << std::setw(8) << i << "-th: " << std::setw(5) << dist[i - 1];
+            if (i != 0 && i % 6 == 0) std::cout << std::endl;
+        }
+    }
 
-				FiveStarDrop.push_back(drop);
-				FiveStarScore.push_back(Rate);
+    void singleWish() {
 
-				countFIVE = 0;
-				Rate = 0;
-			}
-			else {
-				uniform_int_distribution<> dis(0, FiveStarItem.size() - 1);
-				string drop = FiveStarItem[dis(gen)];
-				cout << "5-Star " << drop;
+        numberVal.totalPullCounter++;
+        numberVal.countForFiveStar++;
+        numberVal.countForFourStar++;
+        numberVal.rate++;
 
-				FiveStarDrop.push_back(drop);
-				FiveStarScore.push_back(Rate);
-				countFIVE = 0;
-				Rate = 0;
-			}
+        double chance = charDist(gen);
 
-		}
-		else if (chance < RateForFour() || countFOUR == 10) {
-			if (charDist(gen) < 0.5) {
-				uniform_int_distribution<> dis(0, FourStarCharacter.size() - 1);
-				string drop = FourStarCharacter[dis(gen)];
-				cout << "4-Star " << drop;
+        if (chance < rateForFiveStar(numberVal.countForFiveStar)) {
+            // Character or Item
+            if (charDist(gen) < 0.5) {  
+                std::uniform_int_distribution<size_t> dis(0, fiveStarCharacter.size() - 1);
+                std::string drop = fiveStarCharacter[dis(gen)];
+                std::cout << "5-Star " << drop;
 
-				checkDublicate(drop);
+                if (checkDuplicate(drop)) numberVal.starBless += 25;
+                else numberVal.starBless += 10;
 
-			}
-			else {
-				uniform_int_distribution<> dis(0, FourStarItem.size() - 1);
-				cout << "4-Star	" << FourStarItem[dis(gen)];
-			}
+                listVal.fiveStarDrop.push_back({ drop, numberVal.rate });
 
-			countFOUR = 0;
-		}
-		else {
-			cout << ThreeStarItem[0];
-		}
-	}
+                numberVal.countForFiveStar = 0;
+                numberVal.rate = 0;
+            }
+            else {
+                std::uniform_int_distribution<size_t> dis(0, fiveStarItem.size() - 1);
+                std::string drop = fiveStarItem[dis(gen)];
+                std::cout << "5-Star " << drop;
 
-	void multiWish(int n) {
-		for (int i = 0; i < n; i++) {
-			SingleWish();
-			cout << endl;
-		}
-	}
-};
+                numberVal.starBless += 10;
+                listVal.fiveStarDrop.push_back({ drop, numberVal.rate });
+                listVal.inventory.push_back(drop);
+                numberVal.countForFiveStar = 0;
+                numberVal.rate = 0;
+            }
 
-class Character {
-private:
-protected:
-public:
+        }
+        else if (chance < rateForFourStar(numberVal.countForFourStar)) {
+            // Character or Item
+            if (charDist(gen) < 0.5) {    
+                std::uniform_int_distribution<size_t> dis(0, fourStarCharacter.size() - 1);
+                std::string drop = fourStarCharacter[dis(gen)];
+                std::cout << "4-Star " << drop;
+
+                if (checkDuplicate(drop)) numberVal.starBless += 5;
+                else numberVal.starBless += 2;
+            }
+            else {
+                std::uniform_int_distribution<size_t> dis(0, fourStarItem.size() - 1);
+                std::string drop = fourStarItem[dis(gen)];
+                std::cout << "4-Star " << drop;
+
+                numberVal.starBless += 2;
+                listVal.inventory.push_back(drop);
+            }
+
+            numberVal.countForFourStar = 0;
+        }
+        else {
+            std::cout << threeStarItem[0];
+            numberVal.stardust += 18;
+        }
+    }
+
+    void multiWish(long n) {
+        for (int i = 0; i < n; i++) {
+            singleWish();
+            std::cout << std::endl;
+        }
+    }
 };
 
 int main() {
 
-	setlocale(LC_ALL, "Ru");
-	cout << "SIMULATOR" << endl;
-	cout << endl;
-	GachaSystem Simulate;
+    std::cout << "SIMULATOR" << std::endl;
+    std::cout << std::endl;
+    GachaSystem gachaSystem;
 
-	cout << "(1), чтобы Помолится 1 раз\n(2), чтобы Помолится 10 раз\n(3), чтобы Помолится 100 раз\n(4), чтобы посмотреть статистику" << endl;
+    std::cout << "(1) to Wish once\n(2) to Wish 10 times\n(3) to view inventory\n(4) to view statistics" << std::endl;
 
-	while (true) {
+    while (true) {
 
-		cout << endl;
-		cout << "Всего скучено: " << Simulate.counter << " (" << Simulate.counter * 160 << " Примогемов)" << endl;
-		
-		cout << "____________________" << endl;
+        std::cout << std::endl;
+        std::cout << "Total pulls: " << gachaSystem.getPulls() << " (" << gachaSystem.getPulls() * 160 << " Primogems)" << std::endl;
+        gachaSystem.getCurrency();
 
-		int type = _getch();
-		cout << endl;
+        std::cout << "____________________" << std::endl;
 
-		if (type == '1') {
-			Simulate.SingleWish();
-			cout << endl;
-		}
-		else if (type == '2') {
-			Simulate.multiWish(10);
-			cout << endl;
-		}
-		else if (type == '3') {
-			Simulate.multiWish(100);
-			cout << endl;
-		}
-		else if (type == '4') {
-			cout << "Консты: " << endl;
-			Simulate.ConstList();
+        int type = _getch();
+        std::cout << std::endl;
 
-			cout << endl;
+        if (type == '1') {
+            gachaSystem.singleWish();
+            std::cout << std::endl;
+        }
+        else if (type == '2') {
+            gachaSystem.multiWish(10);
+            std::cout << std::endl;
+        }
+        else if (type == '3') {
+            gachaSystem.getInventory();
+        }
+        else if (type == '4') {
+            std::cout << "Constellations: " << std::endl;
+            gachaSystem.constellationList();
 
-			cout << "Статистика: " << endl;
-			Simulate.GetStat();
-		}
-	}
+            std::cout << std::endl;
+
+            std::cout << "Statistics: " << std::endl;
+            gachaSystem.getStatistic();
+            std::cout << std::endl;
+        }
+        // debug
+        else {
+            gachaSystem.multiWish(1500000);
+        }
+    }
+    return 0;
 }
