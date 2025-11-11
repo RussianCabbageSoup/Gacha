@@ -246,7 +246,6 @@ public:
 };
 
 int main() {
-
     std::cout << "SIMULATOR" << std::endl;
     std::cout << std::endl;
     GachaSystem gachaSystem;
