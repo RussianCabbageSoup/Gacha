@@ -312,8 +312,8 @@ public:
     }
 };
 
-int start_Gacha_Banner() {
-    std::cout << "SIMULATOR" << std::endl;
+int startGacha_Banner() {
+    std::cout << "BANNER SIMULATOR" << std::endl;
     std::cout << std::endl;
     GachaAlgorithm gachaSystem;
     static constexpr int ESC_KEY = 27;
