@@ -7,12 +7,14 @@
 #include <iomanip>
 #include <algorithm>
 #include <string>
+#include <unordered_map>
+#include <thread>
 
 class Banner_System {
 protected:
     std::random_device rd;
     std::mt19937 gen;
-    std::uniform_real_distribution<> charDist;
+    std::uniform_real_distribution<> distribution;
 
     const std::vector<std::string> three_star_item = { "Trash" };
 
@@ -37,15 +39,15 @@ protected:
         struct lists {
             std::vector <std::pair<std::string, int>> five_star_drop;
             std::vector <std::pair<std::string, long>> four_star_drop;
-            std::vector<std::pair<std::string, int>> character_drop;
+            std::unordered_map<std::string, int> character_drop;
             std::vector<std::string> inventory;
         };
         struct counters {
-            int countForFourStar = 0;
-            int countForFiveStar = 0;
+            int pity_five_star = 0;
+            int pity_four_star = 0;
             long currency_1 = 0;
             long currency_2 = 0;
-            int totalPullCounter = 0;
+            int total_pulls = 0;
         };
     };
 
@@ -54,73 +56,61 @@ protected:
 
     struct basis_params {
         struct probability {
-            static constexpr double baseFiveStarChance = 0.0063;
-            static constexpr double baseFourStarChance = 0.051;
-            static constexpr double baseEqualChance = 0.5;
-            static constexpr double baseEventCharChance = 0.585;
+            static constexpr double five_star_chance = 0.0063;
+            static constexpr double four_star_chance = 0.051;
+            static constexpr double equal = 0.5;
+            static constexpr double increase_event_character = 0.585;
             static constexpr std::pair<double, double> factor_pity = { 0.057, 4.15 };
             static constexpr double factor_default = 0.000015;
-
-            static constexpr double baseChance_eventItem = 0.008;
         };
         struct limits {
-            static constexpr int startPityValue = 74;
-            static constexpr int fiveStarLimit = 90;
-            static constexpr int fourStarLimit = 10;
-            static constexpr int constLimit = 6;
-
-            static constexpr int startPityItem = 65;
-            static constexpr int fiveStarItemLimit = 80;
+            static constexpr int start_ptiy_val = 74;
+            static constexpr int five_star_pity_limit = 90;
+            static constexpr int four_star_pity_limit = 10;
+            static constexpr int const_limit = 6;
         };
         struct currency{
-            static constexpr int baseBlessForFiveStar = 10;
-            static constexpr int baseBlessForFourStar = 2;
-            static constexpr int limitBlessForFiveStar = 25;
-            static constexpr int limitBlessForFourStar = 5;
-            static constexpr int starDustValue = 18;
+            static constexpr int ccy_base_five_star = 10;
+            static constexpr int ccy_base_four_star = 2;
+            static constexpr int ccy_limit_five_star = 25;
+            static constexpr int ccy_limit_four_star = 5;
+            static constexpr int star_dust_val = 18;
         };
     };
 
-    bool checkDuplicate(std::string drop) {
-        bool duplicate = false;
-        bool isLastConst = false;
-        size_t index;
-
-        for (size_t i = 0; i < drop_list.character_drop.size(); i++) {
-            if (drop == drop_list.character_drop[i].first) {
-                duplicate = true;
-                index = i;
-                break;
-            }
+    bool is_last_const(std::string drop) {
+        auto it = drop_list.character_drop.find(drop);
+        if (it == drop_list.character_drop.end()) {
+            drop_list.character_drop[drop] = 0;
+            return false;
         }
-        if (!duplicate) {
-            drop_list.character_drop.push_back({ drop, 0 });
+
+        if (it->second == basis_params::limits::const_limit) {
+            return true;
         }
         else {
-            if (drop_list.character_drop[index].second < basis_params::limits::constLimit) { drop_list.character_drop[index].second++; }
-            else isLastConst = true;
+            it->second++;
+            return false;
         }
-        return isLastConst;
     }
+
 
 public:
 
-    Banner_System() : gen(rd()), charDist(0.0, 1.0) {}
+    Banner_System() : gen(rd()), distribution(0.0, 1.0) {}
 
-    std::pair<int, int> getCurrentPity() {
-        return { counter.countForFiveStar, counter.countForFourStar };
+    std::pair<int, int> get_current_pity() {
+        return { counter.pity_four_star, counter.pity_five_star };
     }
 
-    int getPulls() {
-        return counter.totalPullCounter;
-    }
+    int get_pulls() { return counter.total_pulls; }
 
-    void getCurrency() {
+    void get_ccy() {
         std::cout << "Star Bless: " << counter.currency_1 << " (" << counter.currency_1 / 5.0 << ")" << std::endl;
         std::cout << "Stardust: " << counter.currency_2 << std::endl;
     }
 
-    void getInventory() {
+    void get_inventory() {
         if (!drop_list.inventory.empty()) {
             for (size_t i = 1; i < drop_list.inventory.size() + 1; i++) {
                 std::cout << std::setw(30) << drop_list.inventory[i - 1];
@@ -135,12 +125,18 @@ public:
 
     void constellation() {
         if (!drop_list.character_drop.empty()) {
-            std::sort(drop_list.character_drop.begin(), drop_list.character_drop.end(), [](const std::pair<std::string, int>& a, const std::pair<std::string, int>& b) {
-                return a.second > b.second; });
-
-            for (size_t i = 1; i < drop_list.character_drop.size() + 1; i++) {
-                std::cout << std::setw(30) << drop_list.character_drop[i - 1].first << " " << drop_list.character_drop[i - 1].second;
+            std::vector<std::pair<std::string, int>> temp_vec(drop_list.character_drop.begin(),
+                drop_list.character_drop.end());
+            std::sort(temp_vec.begin(), temp_vec.end(),
+                [](const auto& a, const auto& b) {
+                    return a.second > b.second;
+                });
+            
+            int i = 1;
+            for (const auto p: temp_vec) {
+                std::cout << std::setw(30) << p.first << " " << p.second;
                 if (i != 0 && i % 3 == 0) std::cout << std::endl;
+                i++;
             }
         }
         else {
@@ -148,10 +144,10 @@ public:
         }
     }
 
-    void getStatistic(bool debug = false, bool isLite = false) {
+    void get_statistic(bool debug = false, bool is_lite = false) {
 
-        double avrFiveStar = 0;
-        std::vector<int> distFiveStar(basis_params::limits::fiveStarLimit, 0);
+        double avg_pity = 0;
+        std::vector<int> dist_five_star(basis_params::limits::five_star_pity_limit, 0);
 
         if (!drop_list.five_star_drop.empty()) {
             for (size_t i = 1; i < drop_list.five_star_drop.size() + 1; i++) {
@@ -159,13 +155,13 @@ public:
                     std::cout << std::setw(30) << drop_list.five_star_drop[i - 1].first << " - " << std::setw(2) << drop_list.five_star_drop[i - 1].second;
                     if (i != 0 && i % 3 == 0) std::cout << std::endl;
                 }
-                avrFiveStar += drop_list.five_star_drop[i - 1].second;
+                avg_pity += drop_list.five_star_drop[i - 1].second;
             }
-            avrFiveStar /= (double)drop_list.five_star_drop.size();
+            avg_pity /= (double)drop_list.five_star_drop.size();
             std::cout << std::endl;
 
             for (size_t i = 0; i < drop_list.five_star_drop.size(); i++) {
-                distFiveStar[drop_list.five_star_drop[i].second - 1]++;
+                dist_five_star[drop_list.five_star_drop[i].second - 1]++;
             }
         }
         else {
@@ -173,25 +169,25 @@ public:
         }
 
         std::cout << std::endl;
-        std::cout << std::setw(15) << "Average for five star: " << avrFiveStar << std::endl;
+        std::cout << std::setw(15) << "Average for five star: " << avg_pity << std::endl;
 
-        std::vector<int> distFourStar(basis_params::limits::fourStarLimit, 0);
+        std::vector<int> dist_four_star(basis_params::limits::four_star_pity_limit, 0);
 
-        if (!isLite) {
-            double avrFourStar = 0;
+        if (!is_lite) {
+            double avg_four_star = 0;
             
             if (!drop_list.four_star_drop.empty()) {
                 for (size_t i = 1; i < drop_list.four_star_drop.size() + 1; i++) {
-                    avrFourStar += drop_list.four_star_drop[i - 1].second;
+                    avg_four_star += drop_list.four_star_drop[i - 1].second;
                 }
-                avrFourStar /= (double)drop_list.four_star_drop.size();
+                avg_four_star /= (double)drop_list.four_star_drop.size();
                 for (size_t i = 0; i < drop_list.four_star_drop.size(); i++) {
-                    if (!(drop_list.four_star_drop[i].second > basis_params::limits::fourStarLimit)) {
-                        distFourStar[drop_list.four_star_drop[i].second - 1]++;
+                    if (!(drop_list.four_star_drop[i].second > basis_params::limits::four_star_pity_limit)) {
+                        dist_four_star[drop_list.four_star_drop[i].second - 1]++;
                     }
                 }
             }
-            std::cout << std::setw(15) << "Average for four star: " << avrFourStar << std::endl;
+            std::cout << std::setw(15) << "Average for four star: " << avg_four_star << std::endl;
         }
 
         if (debug) {
@@ -199,25 +195,25 @@ public:
             std::cout << std::setw(18) << "Distribution for five star:" << std::endl;
             std::cout << std::endl;
 
-            for (size_t i = 1; i < distFiveStar.size() + 1; i++) {
+            for (size_t i = 1; i < dist_five_star.size() + 1; i++) {
                 long sum = 0;
-                for (size_t j = 0; j < distFiveStar.size(); j++) { sum += distFiveStar[j]; }
+                for (size_t j = 0; j < dist_five_star.size(); j++) { sum += dist_five_star[j]; }
 
-                std::cout << std::setw(12) << i << ": " << std::setw(7) << distFiveStar[i - 1];
+                std::cout << std::setw(12) << i << ": " << std::setw(7) << dist_five_star[i - 1];
                 if (i != 0 && i % 5 == 0) std::cout << std::endl;
             }
 
 
-            if (!isLite) {
+            if (!is_lite) {
                 std::cout << std::endl;
                 std::cout << std::setw(18) << "Distribution for four star:" << std::endl;
                 std::cout << std::endl;
 
-                for (size_t i = 1; i < distFourStar.size() + 1; i++) {
+                for (size_t i = 1; i < dist_four_star.size() + 1; i++) {
                     long sum = 0;
-                    for (size_t j = 0; j < distFourStar.size(); j++) { sum += distFourStar[j]; }
+                    for (size_t j = 0; j < dist_four_star.size(); j++) { sum += dist_four_star[j]; }
 
-                    std::cout << std::setw(15) << i << ": " << std::setw(8) << distFourStar[i - 1];
+                    std::cout << std::setw(15) << i << ": " << std::setw(8) << dist_four_star[i - 1];
                     if (i != 0 && i % 2 == 0) std::cout << std::endl;
                 }
             }
@@ -225,106 +221,100 @@ public:
 
         if (!debug) {
             std::cout << std::endl;
-            std::cout << "Total pulls: " << getPulls() << " (" << getPulls() * 160 << " Primogems)" << std::endl;
-            getCurrency();
+            std::cout << "Total pulls: " << get_pulls() << " (" << get_pulls() * 160 << " Primogems)" << std::endl;
+            get_ccy();
         }
     }
 };
 
 class Default_Banner : public Banner_System {
 private:
-    double calcProbability(int currentPull, bool isPity) {
-        if (isPity) {
-            return basis_params::probability::factor_pity.first * currentPull - basis_params::probability::factor_pity.second;
-        }
-        else {
-            return  basis_params::probability::baseFiveStarChance + (basis_params::probability::factor_default * currentPull);
-        }
+    double calc_probability(int current_pity) {
+        return basis_params::probability::factor_pity.first * current_pity - basis_params::probability::factor_pity.second;
     }
 
-    double rateForFiveStar(int currentPull) {
-        if (currentPull >= basis_params::limits::fiveStarLimit) { return 1.0; }
-        if (currentPull >= basis_params::limits::startPityValue) { return calcProbability(currentPull, true); }
-        else { return calcProbability(currentPull, false); }
+    double five_star_rate(int current_pity) {
+        if (current_pity >= basis_params::limits::five_star_pity_limit) return 1.0;
+        if (current_pity >= basis_params::limits::start_ptiy_val) return calc_probability(current_pity); 
+        else return basis_params::probability::five_star_chance + (basis_params::probability::factor_default * current_pity);
     }
 
-    double rateForFourStar(int currentPull) {
-        if (currentPull >= basis_params::limits::fourStarLimit) { return 1.0; }
-        else { return basis_params::probability::baseFourStarChance; }
+    double four_star_rate(int current_pity) {
+        if (current_pity >= basis_params::limits::four_star_pity_limit) return 1.0;
+        else return basis_params::probability::four_star_chance;
     }
 public:
-    void singleWish(bool debug = false, bool isLite = false) {
+    void single_wish(bool debug = false, bool is_lite = false) {
 
-        counter.totalPullCounter++;
-        counter.countForFiveStar++;
-        counter.countForFourStar++;
+        counter.total_pulls++;
+        counter.pity_four_star++;
+        counter.pity_five_star++;
 
-        double chance = charDist(gen);
-        //std::cout << rateForFiveStar(numeric_space.countForFiveStar) << " ";
-        if (chance < rateForFiveStar(counter.countForFiveStar)) {
-            // Character or Item1
-            if (charDist(gen) < basis_params::probability::baseEqualChance) {
+        double chance = distribution(gen);
+
+        if (chance < five_star_rate(counter.pity_four_star)) {
+            if (distribution(gen) < basis_params::probability::equal) {
                 std::uniform_int_distribution<size_t> dis(0, five_star_character.size() - 1);
                 std::string drop = five_star_character[dis(gen)];
                 if (!debug) { std::cout << "\033[33m5-STAR " << drop << "\033[0m"; }
 
                 if (!debug) {
-                    if (checkDuplicate(drop)) counter.currency_1 += basis_params::currency::limitBlessForFiveStar;
-                    else counter.currency_1 += basis_params::currency::baseBlessForFiveStar;
+                    if (is_last_const(drop)) counter.currency_1 += basis_params::currency::ccy_limit_five_star;
+                    else counter.currency_1 += basis_params::currency::ccy_base_five_star;
                 }
 
-                drop_list.five_star_drop.push_back({ drop, counter.countForFiveStar });
+                drop_list.five_star_drop.push_back({ drop, counter.pity_four_star });
 
-                counter.countForFiveStar = 0;
+                counter.pity_four_star = 0;
             }
             else {
                 std::uniform_int_distribution<size_t> dis(0, five_star_item.size() - 1);
                 std::string drop = five_star_item[dis(gen)];
                 if (!debug) { std::cout << "\033[33m5-STAR " << drop << "\033[0m"; }
 
-                counter.currency_1 += basis_params::currency::baseBlessForFiveStar;
-                drop_list.five_star_drop.push_back({ drop, counter.countForFiveStar });
+                counter.currency_1 += basis_params::currency::ccy_base_five_star;
+                drop_list.five_star_drop.push_back({ drop, counter.pity_four_star });
                 drop_list.inventory.push_back(drop);
-                counter.countForFiveStar = 0;
+                counter.pity_four_star = 0;
             }
 
         }
-        else if (chance < rateForFourStar(counter.countForFourStar) && !isLite) {
+        else if (chance < four_star_rate(counter.pity_five_star) && !is_lite) {
             // Character or Item
-            if (charDist(gen) < basis_params::probability::baseEqualChance) {
+            if (distribution(gen) < basis_params::probability::equal) {
                 std::uniform_int_distribution<size_t> dis(0, four_star_character.size() - 1);
                 std::string drop = four_star_character[dis(gen)];
                 if (!debug) { std::cout << "\033[35m4-Star " << drop << "\033[0m"; }
 
                 if (!debug) {
-                    if (checkDuplicate(drop)) counter.currency_1 += basis_params::currency::limitBlessForFourStar;
-                    else counter.currency_1 += basis_params::currency::baseBlessForFourStar;
+                    if (is_last_const(drop)) counter.currency_1 += basis_params::currency::ccy_limit_four_star;
+                    else counter.currency_1 += basis_params::currency::ccy_base_four_star;
                 }
-                drop_list.four_star_drop.push_back({ drop, counter.countForFourStar });
+                drop_list.four_star_drop.push_back({ drop, counter.pity_five_star });
             }
             else {
                 std::uniform_int_distribution<size_t> dis(0, four_star_item.size() - 1);
                 std::string drop = four_star_item[dis(gen)];
                 if (!debug) { std::cout << "\033[35m4-Star " << drop << "\033[0m"; }
 
-                counter.currency_1 += basis_params::currency::baseBlessForFourStar;
+                counter.currency_1 += basis_params::currency::ccy_base_four_star;
                 drop_list.inventory.push_back(drop);
-                drop_list.four_star_drop.push_back({ drop, counter.countForFourStar });
+                drop_list.four_star_drop.push_back({ drop, counter.pity_five_star });
             }
 
-            counter.countForFourStar = 0;
+            counter.pity_five_star = 0;
         }
         else {
             if (!debug) {
                 std::cout << "\033[36m" << three_star_item[0] << "\033[0m";
-                counter.currency_2 += basis_params::currency::starDustValue;
+                counter.currency_2 += basis_params::currency::star_dust_val;
             }
         }
     }
 
-    void multiWish(long n, bool debug = false, bool isLite = false) {
+    void multiwish(long n, bool debug = false, bool is_lite = false) {
         for (long i = 0; i < n; i++) {
-            singleWish(debug, isLite);
+            single_wish(debug, is_lite);
             if (!debug) { std::cout << std::endl; }
         }
     }
@@ -332,56 +322,51 @@ public:
 
 class Event_CharacterBanner : public Banner_System {
 private:
-    const std::string eventFiveStar = "EVENT";
-    const std::vector<std::string> eventFourStar = { "event1", "event2", "event3" };
+    const std::string event_character = "EVENT";
+    const std::vector<std::string> event_epics = { "event1", "event2", "event3" };
 
-    bool gotDefaultFiveStar = false;
-    bool gotDefaultFourStar = false;
+    bool lost_lega = false;
+    bool lost_epic = false;
 
-    double calcProbability(int currentPull, bool isPity) {
-        if (isPity) {
-            return basis_params::probability::factor_pity.first * currentPull - basis_params::probability::factor_pity.second;
-        }
-        else {
-            return  basis_params::probability::baseFiveStarChance + (basis_params::probability::factor_default * currentPull);
-        }
+    double calc_probability(int current_pity) {
+        return basis_params::probability::factor_pity.first * current_pity - basis_params::probability::factor_pity.second;
     }
 
-    double rateForFiveStar(int currentPull) {
-        if (currentPull >= basis_params::limits::fiveStarLimit) { return 1.0; }
-        if (currentPull >= basis_params::limits::startPityValue) { return calcProbability(currentPull, true); }
-        else { return calcProbability(currentPull, false); }
+    double five_star_rate(int current_pity) {
+        if (current_pity >= basis_params::limits::five_star_pity_limit) return 1.0;
+        if (current_pity >= basis_params::limits::start_ptiy_val) return calc_probability(current_pity);
+        else return basis_params::probability::five_star_chance + (basis_params::probability::factor_default * current_pity);
     }
 
-    double rateForFourStar(int currentPull) {
-        if (currentPull >= basis_params::limits::fourStarLimit) { return 1.0; }
-        else { return basis_params::probability::baseFourStarChance; }
+    double four_star_rate(int current_pity) {
+        if (current_pity >= basis_params::limits::four_star_pity_limit) return 1.0;
+        else return basis_params::probability::four_star_chance;
     }
 
 public:
 
-    void singleWish(bool debug = false, bool isLite = false) {
+    void single_wish(bool debug = false, bool is_lite = false) {
 
-        counter.totalPullCounter++;
-        counter.countForFiveStar++;
-        counter.countForFourStar++;
+        counter.total_pulls++;
+        counter.pity_four_star++;
+        counter.pity_five_star++;
 
-        double chance = charDist(gen);
+        double chance = distribution(gen);
         //std::cout << rateForFiveStar(numeric_space.countForFiveStar) << " ";
-        if (chance < rateForFiveStar(counter.countForFiveStar)) {
-            if (charDist(gen) < basis_params::probability::baseEventCharChance || gotDefaultFiveStar) {
+        if (chance < five_star_rate(counter.pity_four_star)) {
+            if (distribution(gen) < basis_params::probability::increase_event_character || lost_lega) {
 
-                if (!debug) { std::cout << "\033[33m5-STAR " << eventFiveStar << "\033[0m"; }
+                if (!debug) { std::cout << "\033[33m5-STAR " << event_character << "\033[0m"; }
 
                 if (!debug) {
-                    if (checkDuplicate(eventFiveStar)) counter.currency_1 += basis_params::currency::limitBlessForFiveStar;
-                    else counter.currency_1 += basis_params::currency::baseBlessForFiveStar;
+                    if (is_last_const(event_character)) counter.currency_1 += basis_params::currency::ccy_limit_five_star;
+                    else counter.currency_1 += basis_params::currency::ccy_base_five_star;
                 }
 
-                drop_list.five_star_drop.push_back({ eventFiveStar, counter.countForFiveStar });
+                drop_list.five_star_drop.push_back({ event_character, counter.pity_four_star });
 
-                counter.countForFiveStar = 0;
-                gotDefaultFiveStar = false;
+                counter.pity_four_star = 0;
+                lost_lega = false;
             }
             else {
                 std::uniform_int_distribution<size_t> dis(0, five_star_character.size() - 1);
@@ -389,76 +374,72 @@ public:
                 if (!debug) { std::cout << "\033[33m5-STAR " << drop << "\033[0m"; }
 
                 if (!debug) {
-                    if (checkDuplicate(drop)) counter.currency_1 += basis_params::currency::limitBlessForFiveStar;
-                    else counter.currency_1 += basis_params::currency::baseBlessForFiveStar;
+                    if (is_last_const(drop)) counter.currency_1 += basis_params::currency::ccy_limit_five_star;
+                    else counter.currency_1 += basis_params::currency::ccy_base_five_star;
                 }
 
-                drop_list.five_star_drop.push_back({ drop, counter.countForFiveStar });
+                drop_list.five_star_drop.push_back({ drop, counter.pity_four_star });
 
-                counter.countForFiveStar = 0;
-                gotDefaultFiveStar = true;
+                counter.pity_four_star = 0;
+                lost_lega = true;
             }
 
         }
-        else if (chance < rateForFourStar(counter.countForFourStar) && !isLite) {
-            if (charDist(gen) < basis_params::probability::baseEqualChance || gotDefaultFourStar) {
-                std::uniform_int_distribution<size_t> dis(0, eventFourStar.size() - 1);
-                std::string drop = eventFourStar[dis(gen)];
+        else if (chance < four_star_rate(counter.pity_five_star) && !is_lite) {
+            if (distribution(gen) < basis_params::probability::equal || lost_epic) {
+                std::uniform_int_distribution<size_t> dis(0, event_epics.size() - 1);
+                std::string drop = event_epics[dis(gen)];
 
                 if (!debug) { std::cout << "\033[35m4-Star " << drop << "\033[0m"; }
 
                 if (!debug) {
-                    if (checkDuplicate(drop)) counter.currency_1 += basis_params::currency::limitBlessForFourStar;
-                    else counter.currency_1 += basis_params::currency::baseBlessForFourStar;
+                    if (is_last_const(drop)) counter.currency_1 += basis_params::currency::ccy_limit_four_star;
+                    else counter.currency_1 += basis_params::currency::ccy_base_four_star;
                 }
 
-                drop_list.four_star_drop.push_back({ drop, counter.countForFourStar });
-                gotDefaultFourStar = false;
+                drop_list.four_star_drop.push_back({ drop, counter.pity_five_star });
+                lost_epic = false;
             }
             else {
-                if (charDist(gen) < basis_params::probability::baseEqualChance) {
+                if (distribution(gen) < basis_params::probability::equal) {
                     std::uniform_int_distribution<size_t> dis(0, four_star_character.size() - 1);
                     std::string drop = four_star_character[dis(gen)];
                     if (!debug) { std::cout << "\033[35m4-Star " << drop << "\033[0m"; }
 
                     if (!debug) {
-                        if (checkDuplicate(drop)) counter.currency_1 += basis_params::currency::limitBlessForFourStar;
-                        else counter.currency_1 += basis_params::currency::baseBlessForFourStar;
+                        if (is_last_const(drop)) counter.currency_1 += basis_params::currency::ccy_limit_four_star;
+                        else counter.currency_1 += basis_params::currency::ccy_base_four_star;
                     }
-                    drop_list.four_star_drop.push_back({ drop, counter.countForFourStar });
+                    drop_list.four_star_drop.push_back({ drop, counter.pity_five_star });
                 }
                 else {
                     std::uniform_int_distribution<size_t> dis(0, four_star_item.size() - 1);
                     std::string drop = four_star_item[dis(gen)];
                     if (!debug) { std::cout << "\033[35m4-Star " << drop << "\033[0m"; }
 
-                    counter.currency_1 += basis_params::currency::baseBlessForFourStar;
+                    counter.currency_1 += basis_params::currency::ccy_base_four_star;
                     drop_list.inventory.push_back(drop);
-                    drop_list.four_star_drop.push_back({ drop, counter.countForFourStar });
+                    drop_list.four_star_drop.push_back({ drop, counter.pity_five_star });
                 }
 
-                gotDefaultFourStar = true;
+                lost_epic = true;
             }
-            counter.countForFourStar = 0;
+            counter.pity_five_star = 0;
         }
         else {
             if (!debug) {
                 std::cout << "\033[36m" << three_star_item[0] << "\033[0m";
-                counter.currency_2 += basis_params::currency::starDustValue;
+                counter.currency_2 += basis_params::currency::star_dust_val;
             }
         }
     }
 
-    void multiWish(long n, bool debug = false, bool isLite = false) {
+    void multiwish(long n, bool debug = false, bool is_lite = false) {
         for (long i = 0; i < n; i++) {
-            singleWish(debug, isLite);
-            if (!debug) { std::cout << std::endl; }
+            single_wish(debug, is_lite);
+            if (!debug) std::cout << std::endl;
         }
     }
-};
-
-class Event_WeaponBanner {
-
 };
 
 class Debug_System {
@@ -467,36 +448,36 @@ private:
     Default_Banner object_1;
     Event_CharacterBanner object_2;
 
-    bool isDefault;
+    bool is_default_banner;
 
-    void distTest(bool isLite = false) {
+    void distribution_test(bool is_lite = false) {
         long n;
         std::cout << "> "; std::cin >> n;
 
-        if (isDefault) {
-            if (isLite) {
-                object_1.multiWish(n, true, true);
-                object_1.getStatistic(true, true);
+        if (is_default_banner) {
+            if (is_lite) {
+                object_1.multiwish(n, true, true);
+                object_1.get_statistic(true, true);
             }
             else {
-                object_1.multiWish(n, true);
-                object_1.getStatistic(true);
+                object_1.multiwish(n, true);
+                object_1.get_statistic(true);
             }
         }
         else {
-            if (isLite) {
-                object_2.multiWish(n, true, true);
-                object_2.getStatistic(true, true);
+            if (is_lite) {
+                object_2.multiwish(n, true, true);
+                object_2.get_statistic(true, true);
             }
             else {
-                object_2.multiWish(n, true);
-                object_2.getStatistic(true);
+                object_2.multiwish(n, true);
+                object_2.get_statistic(true);
             }
         }
     }
 public:
 
-    Debug_System(bool v) : isDefault(v) {}
+    Debug_System(bool v) : is_default_banner(v) {}
 
     void start() {
         std::string command;
@@ -505,8 +486,8 @@ public:
             std::cout << std::endl;
 
             if (command == "exit") { break; }
-            else if (command == "mw") { distTest(); }
-            else if (command == "mwl") { distTest(true); }
+            else if (command == "mw") { distribution_test(); }
+            else if (command == "mwl") { distribution_test(true); }
             else { std::cout << "command not found\n" << std::endl; }
         }
         command.clear();
@@ -518,50 +499,50 @@ int start_banner();
 
 int start_EventBanner() {
 
-    Event_CharacterBanner eventBanner;
+    Event_CharacterBanner event_banner;
 
     std::cout << "\n|| EVENT BANNER ||\n\n";
     std::cout << "(1) Wish once\n(2) Wish 10 times\n(3) View inventory\n(4) View statistics" << std::endl;
 
     while (true) {
         std::cout << std::endl;
-        std::pair<int, int> current_pity = eventBanner.getCurrentPity();
+        std::pair<int, int> current_pity = event_banner.get_current_pity();
         std::cout << "Pity 5-Star: " << current_pity.first << std::endl;
         std::cout << "Pity 4-Star: " << current_pity.second << std::endl;
 
         std::cout << "____________________\n" << std::endl;
 
-        bool correctKey = false;
+        bool correct_key = false;
 
-        while (!correctKey) {
+        while (!correct_key) {
             int click = _getch();
 
             switch (click) {
             case('1'):
-                eventBanner.singleWish();
+                event_banner.single_wish();
                 std::cout << std::endl;
-                correctKey = true;
+                correct_key = true;
                 break;
 
             case('2'):
-                eventBanner.multiWish(10);
-                correctKey = true;
+                event_banner.multiwish(10);
+                correct_key = true;
                 break;
             
             case('3'):
-                eventBanner.getInventory();
-                correctKey = true;
+                event_banner.get_inventory();
+                correct_key = true;
                 break;
             
             case('4'):
                 std::cout << "Constellations: " << std::endl;
-                eventBanner.constellation();
+                event_banner.constellation();
 
                 std::cout << std::endl;
 
                 std::cout << "Statistics: " << std::endl;
-                eventBanner.getStatistic();
-                correctKey = true;
+                event_banner.get_statistic();
+                correct_key = true;
                 break;
             
             case(ESC_KEY): return 0;
@@ -576,7 +557,7 @@ int start_EventBanner() {
                         init.start();
                     }
                 }
-                correctKey = true;
+                correct_key = true;
                 break;
             }
         }
@@ -586,7 +567,7 @@ int start_EventBanner() {
 
 int start_DefaultBanner() {
 
-    Default_Banner defaultBanner;
+    Default_Banner default_banner;
 
     std::cout << "\n|| DEFAULT BANNER ||\n\n";
     std::cout << "(1) Wish once\n(2) Wish 10 times\n(3) View inventory\n(4) View statistics" << std::endl;
@@ -594,42 +575,42 @@ int start_DefaultBanner() {
     while (true) {
 
         std::cout << std::endl;
-        std::pair<int, int> current_pity = defaultBanner.getCurrentPity();
+        std::pair<int, int> current_pity = default_banner.get_current_pity();
         std::cout << "Pity 5-Star: " << current_pity.first << std::endl;
         std::cout << "Pity 4-Star: " << current_pity.second << std::endl;
 
         std::cout << "____________________\n" << std::endl;
 
-        bool correctKey = false;
+        bool correct_key = false;
 
-        while (!correctKey) {
+        while (!correct_key) {
             int click = _getch();
 
             switch (click) {
             case('1'):
-                defaultBanner.singleWish();
+                default_banner.single_wish();
                 std::cout << std::endl;
-                correctKey = true;
+                correct_key = true;
                 break;
 
             case('2'):
-                defaultBanner.multiWish(10);
-                correctKey = true;
+                default_banner.multiwish(10);
+                correct_key = true;
                 break;
 
             case('3'):
-                defaultBanner.getInventory();
-                correctKey = true;
+                default_banner.get_inventory();
+                correct_key = true;
                 break;
 
             case('4'):
                 std::cout << "Constellations: " << std::endl;
-                defaultBanner.constellation();
+                default_banner.constellation();
                 std::cout << std::endl;
 
                 std::cout << "Statistics: " << std::endl;
-                defaultBanner.getStatistic();
-                correctKey = true;
+                default_banner.get_statistic();
+                correct_key = true;
                 break;
 
             case(ESC_KEY): return 0;
@@ -642,7 +623,7 @@ int start_DefaultBanner() {
                     Debug_System init(true);
                     init.start();
                 }
-                correctKey = true;
+                correct_key = true;
                 break;
             }
         }
@@ -656,14 +637,14 @@ int start_banner() {
     while (true) {
         std::cout << "\n(1) Event Banner\n(2) Default Banner" << std::endl;
 
-        bool correctKey = false;
+        bool correct_key = false;
 
-        while (!correctKey) {
+        while (!correct_key) {
             int click = _getch();
 
             switch (click) {
-            case('1'): start_EventBanner(); correctKey = true; break;
-            case('2'): start_DefaultBanner(); correctKey = true; break;
+            case('1'): start_EventBanner(); correct_key = true; break;
+            case('2'): start_DefaultBanner(); correct_key = true; break;
             case(ESC_KEY): return 0;
             }
         }
