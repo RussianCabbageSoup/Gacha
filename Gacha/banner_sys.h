@@ -8,7 +8,6 @@
 #include <algorithm>
 #include <string>
 #include <unordered_map>
-#include <thread>
 
 class Banner_System {
 protected:
@@ -74,7 +73,7 @@ protected:
             static constexpr int ccy_base_four_star = 2;
             static constexpr int ccy_limit_five_star = 25;
             static constexpr int ccy_limit_four_star = 5;
-            static constexpr int star_dust_val = 18;
+            static constexpr int star_dust_val = 15;
         };
     };
 
